@@ -73,7 +73,11 @@ public class ProcessAllImagesInFolderUtility
                     System.exit(1);
                 }
                 log = new PrintStream(new FileOutputStream(args[++i], false), true);
-            } else {
+            } else if( arg.equalsIgnoreCase("--rename")) {
+                i++;
+                handler = new RenameFileHandler( args[i]);
+            }
+            else {
                 // Treat this argument as a directory
                 directories.add(arg);
             }
@@ -708,6 +712,46 @@ public class ProcessAllImagesInFolderUtility
                     tag.getDescription();
                 }
             }
+        }
+    }
+
+
+    static class RenameFileHandler extends FileHandlerBase
+    {
+        private String dest;
+        public RenameFileHandler(String dir) {
+            this.dest = dir;
+        }
+
+        @Override
+        public void onExtractionSuccess(@NotNull File file, @NotNull Metadata metadata, @NotNull String relativePath, @NotNull PrintStream log)
+        {
+            super.onExtractionSuccess(file, metadata, relativePath, log);
+
+            // Iterate through all values, calling toString to flush out any formatting exceptions
+            String model="other", date="1900-01-01";
+            for (Directory directory : metadata.getDirectories()) {
+                if( "Exif SubIFD".equals(directory.getName()) || "Exif IFD0".equals(directory.getName())
+                    || "QuickTime Metadata".equals(directory.getName()) ) {
+                    for (Tag tag : directory.getTags()) {
+                        if ("Model".equals(tag.getTagName())) {
+                            model = tag.getDescription();
+                        } else if ("Date/Time".equals(tag.getTagName()) || "Creation Date".equalsIgnoreCase(tag.getTagName())
+                                || "Date/Time Original".equals(tag.getTagName() )) {
+                            date = tag.getDescription();
+                        }
+                    }
+                }
+            }
+            model = model.replaceAll(" ", "");
+            date = date.replaceAll(" .*$", "" ).replaceAll(":", "-").replaceAll("T.*$", "");
+
+            File destDir = new File(dest + "/" + model + "/" + date);
+            if(!destDir.exists()) {
+                destDir.mkdirs();
+            }
+            File destFile = new File( dest + "/" + model + "/" + date + "/" + file.getName() );
+            file.renameTo(destFile);
         }
     }
 }
